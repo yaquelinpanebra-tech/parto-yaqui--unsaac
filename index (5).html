@@ -1,0 +1,1195 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Sala de Partos</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Figtree:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+/* Concepto: escena 3D a pantalla completa con HUD de cristal oscuro. Arriba: tarjetas de pacientes. Abajo: Cronómetro 1 (dolor y probabilidad), acciones, Cronómetro 2 (emergencia). */
+:root{
+  --bg:#0b1a21; --panel:rgba(9,24,31,.84); --panel-solid:#0f232c; --line:rgba(160,225,215,.2);
+  --text:#e8f5f2; --muted:#8db1ac; --teal:#3fd6bd; --rose:#ff7a98; --alarm:#ff4155; --amber:#ffc24d; --good:#3be08a;
+  --display:'Barlow Semi Condensed','Arial Narrow',sans-serif; --body:'Figtree',system-ui,sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14px;overflow:hidden;-webkit-user-select:none;user-select:none}
+#app{position:fixed;inset:0}
+#c{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#hud{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none;
+  padding-top:calc(10px + env(safe-area-inset-top,0px));padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));gap:8px}
+#hud button,#hud .panel{pointer-events:auto}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;justify-content:space-between}
+.brand{font-family:var(--display);font-weight:700;font-size:20px;letter-spacing:.06em;text-transform:uppercase;padding:6px 12px}
+.stats{display:flex;gap:14px;align-items:center;padding:6px 12px;font-weight:600}
+.stats span.k{color:var(--muted);font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-right:5px}
+.stats b{font-family:var(--display);font-size:20px;font-variant-numeric:tabular-nums}
+.hearts{display:flex;gap:3px}
+.heart{width:16px;height:16px;background:var(--rose);clip-path:path('M8 15 C-4 6 2 -2 8 4 C14 -2 20 6 8 15Z');transition:.3s}
+.heart.off{background:#3a4a50;transform:scale(.8)}
+.tools{display:flex;gap:6px}
+.tools button{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:7px 12px;font-weight:600}
+.tools button:hover{border-color:var(--teal)}
+#cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;max-width:760px}
+.pc{text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 10px;display:flex;flex-direction:column;gap:3px;min-width:0;transition:border-color .2s,box-shadow .2s}
+.pc.sel{border-color:var(--teal);box-shadow:0 0 0 1px var(--teal) inset}
+.pc.alarm{border-color:var(--alarm);animation:blink .5s infinite alternate}
+.pc.empty{opacity:.5}
+.pc-top{display:flex;justify-content:space-between;gap:6px;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.pc-st{color:var(--teal);white-space:nowrap}
+.pc.alarm .pc-st{color:var(--alarm);font-weight:700}
+.pc-name{font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc-row{display:flex;align-items:center;gap:8px}
+.pc-pct{font-family:var(--display);font-size:22px;font-variant-numeric:tabular-nums;min-width:48px}
+.bar{position:relative;flex:1;height:8px;border-radius:5px;background:rgba(255,255,255,.1);overflow:hidden}
+.bar i{position:absolute;left:0;top:0;bottom:0;width:0;background:linear-gradient(90deg,var(--teal),#b6f06a);border-radius:5px}
+.bar.pain i{background:linear-gradient(90deg,var(--amber),var(--alarm))}
+.bar u{position:absolute;left:85%;top:-1px;bottom:-1px;width:2px;background:var(--text);opacity:.7}
+#mid{display:flex;flex-direction:column;gap:6px;align-items:flex-start;flex:1;justify-content:flex-end;min-height:0}
+#guide{max-width:560px;padding:8px 12px;font-weight:600;line-height:1.35;border-left:3px solid var(--teal)}
+#guide.alarm{border-left-color:var(--alarm)}
+#toast{max-width:560px;padding:8px 12px;border-radius:10px;font-weight:700;background:var(--panel-solid);border:1px solid var(--line);opacity:0;transform:translateY(6px);transition:.25s;pointer-events:none}
+#toast.show{opacity:1;transform:none}
+#toast.good{border-color:var(--teal);color:#bff6ea}
+#toast.bad{border-color:var(--alarm);color:#ffc4cb}
+#toast.warn{border-color:var(--amber);color:#ffe2a6}
+#bottom{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:stretch}
+.clock{padding:10px 12px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.ck-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.ck-tag{font-family:var(--display);font-weight:700;letter-spacing:.08em;font-size:13px;text-transform:uppercase;color:var(--teal)}
+#clk2 .ck-tag{color:var(--amber)}
+#clk2.on .ck-tag{color:var(--alarm)}
+.ck-sub{font-size:11px;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ck-body{display:flex;gap:12px;align-items:center;min-width:0}
+.ring{position:relative;width:96px;height:96px;flex:none}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring circle{fill:none;stroke-width:9}
+.r-track{stroke:rgba(255,255,255,.1)}
+.r-win{stroke:#7dffb0;opacity:0}
+.r-prog{stroke:var(--teal);stroke-linecap:round;transition:stroke .2s}
+.ring .t{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--display);font-size:25px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+.ring .t small{font-family:var(--body);font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:3px;font-weight:600}
+.ck-data{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.lbl{font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.big{font-family:var(--display);font-size:34px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+#clk2.on{border-color:var(--alarm);animation:blink .45s infinite alternate}
+#clk2.on .r-prog{stroke:var(--alarm)}
+#clk2 .r-prog{stroke:#3a6b63}
+#em-txt{font-weight:700;line-height:1.25;min-height:2.5em}
+#clk2.on #em-txt{color:#ffc4cb}
+#actions{padding:10px 12px;display:flex;flex-direction:column;gap:7px}
+.row{display:flex;gap:7px;flex-wrap:wrap}
+.btn{flex:1;min-width:0;border-radius:10px;border:1px solid var(--line);background:#14313b;padding:10px 8px;font-weight:700;text-align:center;transition:transform .1s,background .2s,opacity .2s}
+.btn:hover:not(:disabled){background:#1b4350}
+.btn:active:not(:disabled){transform:scale(.97)}
+.btn:disabled{opacity:.38;cursor:not-allowed}
+.btn.move{background:var(--teal);color:#06261f;border-color:transparent}
+.btn.move:hover:not(:disabled){background:#6be8d4}
+.btn.push{background:var(--rose);color:#3a0716;border-color:transparent;font-size:17px;padding:12px 8px;font-family:var(--display);letter-spacing:.05em;text-transform:uppercase}
+.btn.push:hover:not(:disabled){background:#ff9bb1}
+.btn.tr small{display:block;font-weight:500;font-size:10px;color:var(--muted);margin-top:1px}
+.legend{font-size:11px;color:var(--muted);line-height:1.35}
+kbd{font-family:var(--display);border:1px solid var(--line);border-radius:4px;padding:0 4px;font-size:11px;color:var(--text)}
+#vignette{position:absolute;inset:0;pointer-events:none;opacity:0;box-shadow:inset 0 0 140px 30px rgba(255,40,70,.55);transition:opacity .2s}
+#vignette.on{opacity:1;animation:blink .45s infinite alternate}
+@keyframes blink{from{filter:brightness(1)}to{filter:brightness(1.55)}}
+#overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(6,16,21,.72);padding:16px;box-sizing:border-box;overflow:auto}
+#overlay[hidden]{display:none}
+.card{width:min(560px,100%);padding:24px;border-radius:16px;background:var(--panel-solid);border:1px solid var(--line);box-sizing:border-box}
+.card h1{font-family:var(--display);font-size:42px;line-height:1;margin:0 0 6px;letter-spacing:.03em;text-transform:uppercase;text-wrap:balance}
+.card p.lead{margin:0 0 14px;color:var(--muted);line-height:1.45}
+.card ol{margin:0 0 18px;padding:0;list-style:none;display:flex;flex-direction:column;gap:9px;counter-reset:s}
+.card li{counter-increment:s;display:flex;gap:10px;line-height:1.4}
+.card li::before{content:counter(s);flex:none;width:24px;height:24px;border-radius:50%;background:var(--teal);color:#06261f;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:13px}
+.card li b{color:var(--teal)}
+.card .go{width:100%;font-family:var(--display);font-size:22px;letter-spacing:.06em;text-transform:uppercase;padding:12px}
+.card .fine{margin:12px 0 0;font-size:12px;color:var(--muted)}
+.end-score{font-family:var(--display);font-size:54px;font-weight:700;color:var(--teal);line-height:1;margin:6px 0 14px}
+#side{position:absolute;top:calc(60px + env(safe-area-inset-top,0px));right:max(16px,env(safe-area-inset-right,0px));width:292px;max-height:calc(100% - 330px);overflow:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px;box-sizing:border-box}
+.sd-head{display:flex;justify-content:space-between;align-items:center}
+.sd-head button{background:none;border:0;font-size:20px;color:var(--muted);padding:0 4px;line-height:1}
+.h-name{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:16px}
+.chip{display:inline-block;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:700;border:1px solid var(--line);background:rgba(255,255,255,.06)}
+.chip.lo{color:#9bf2c4;border-color:#2e7a5c}.chip.mid{color:var(--amber);border-color:#8a6a1f}.chip.hi{color:#ffc4cb;border-color:var(--alarm)}.chip.warn{color:#ffe2a6;border-color:#8a6a1f}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.h-grid{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin:6px 0;font-size:12.5px}
+.h-grid dt{color:var(--muted)}.h-grid dd{margin:0;font-weight:600}
+.plog{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:2px;font-size:12px}
+.plog time{font-family:var(--display);color:var(--teal);margin-right:6px;font-variant-numeric:tabular-nums}
+.tl{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line);padding-top:8px}
+.tl-title{font-family:var(--display);font-weight:700;letter-spacing:.07em;text-transform:uppercase;font-size:13px;color:var(--amber)}
+.tl-body{display:flex;gap:12px;align-items:center}
+.lamps{display:flex;flex-direction:column;gap:5px;padding:6px;border-radius:14px;background:#06141a;border:1px solid var(--line)}
+.lamps i{width:22px;height:22px;border-radius:50%;opacity:.18;transition:opacity .12s,box-shadow .12s}
+.lamps i:nth-child(1){background:var(--good)}.lamps i:nth-child(2){background:var(--amber)}.lamps i:nth-child(3){background:var(--alarm)}
+.lamps i.on{opacity:1}
+.lamps i:nth-child(1).on{box-shadow:0 0 14px var(--good)}.lamps i:nth-child(2).on{box-shadow:0 0 14px var(--amber)}.lamps i:nth-child(3).on{box-shadow:0 0 14px var(--alarm)}
+.tl-read{display:flex;flex-direction:column;gap:1px}
+.tl-read b{font-family:var(--display);font-size:32px;line-height:1;font-variant-numeric:tabular-nums}
+.tl-read small{color:var(--muted);font-size:11px}
+.mr{display:grid;grid-template-columns:16px 1fr auto;gap:8px;align-items:center;font-size:13px;padding:3px 0}
+.mr .lamp{width:14px;height:14px;border-radius:50%;background:#44575d}
+.mr.ok .lamp{background:var(--good);box-shadow:0 0 10px var(--good)}
+.mr.caution .lamp{background:var(--amber);box-shadow:0 0 10px var(--amber)}
+.mr.no .lamp{background:var(--alarm);box-shadow:0 0 10px var(--alarm)}
+.mr.done .lamp{background:var(--teal)}
+.mr span{font-size:11px;color:var(--muted);text-align:right}
+.mr.caution span{color:#ffe2a6}.mr.no span{color:#ffc4cb}
+.cr{display:grid;grid-template-columns:12px 1fr auto;gap:8px;align-items:center;padding:3px 0;font-size:13px}
+.cr small{display:block;color:var(--muted);font-size:11px}
+.duty{width:10px;height:10px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good)}
+.cr-st{font-size:11px;color:var(--teal);white-space:nowrap}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#44575d;margin-right:6px;vertical-align:middle}
+.dot.ok{background:var(--good)}.dot.caution{background:var(--amber)}.dot.no{background:var(--alarm)}
+.btn.tr{font-size:13px}
+.pc,.pc.sel,.pc.alarm{border-left:7px solid var(--pl,#44575d)}
+@media (max-width:760px){
+  #side{left:max(16px,env(safe-area-inset-left,0px));width:auto;top:calc(112px + env(safe-area-inset-top,0px));max-height:46%}
+  #bottom{grid-template-columns:1fr 1fr}
+  #actions{grid-column:1 / -1;order:3}
+  .ring{width:72px;height:72px}.ring .t{font-size:19px}
+  .big{font-size:26px}
+  .brand{font-size:16px}
+  #guide,#toast{font-size:13px}
+  .pc-pct{font-size:18px;min-width:40px}
+  .pc{padding:6px 8px}
+  .stats{gap:10px}
+  .legend{display:none}
+  .card h1{font-size:34px}
+}
+@media (prefers-reduced-motion:reduce){.pc.alarm,#clk2.on,#vignette.on{animation:none}}
+</style>
+
+<div id="app">
+  <canvas id="c" aria-label="Escena 3D de la sala de partos"></canvas>
+  <div id="vignette"></div>
+  <div id="hud">
+    <div>
+      <header id="top">
+        <div class="brand panel">Sala de Partos</div>
+        <div class="stats panel">
+          <div><span class="k">Puntos</span><b id="score">0</b></div>
+          <div><span class="k">Partos</span><b id="births">0/6</b></div>
+          <div><span class="k">Tiempo</span><b id="gtime">00:00</b></div>
+          <div class="hearts" id="lives" aria-label="Vidas"></div>
+        </div>
+        <div class="tools">
+          <button id="btnView" type="button">Vista general</button>
+          <button id="btnFicha" type="button">Ficha</button>
+          <button id="btnSound" type="button">Sonido: sí</button>
+        </div>
+      </header>
+      <div id="cards" style="margin-top:8px"></div>
+    </div>
+    <div id="mid">
+      <div id="guide" class="panel"></div>
+      <div id="toast"></div>
+    </div>
+    <footer id="bottom">
+      <section class="clock panel" id="clk1">
+        <div class="ck-head"><span class="ck-tag">Cronómetro 1</span><span class="ck-sub" id="c1-who">Dolor y parto</span></div>
+        <div class="ck-body">
+          <div class="ring">
+            <svg viewBox="0 0 100 100"><circle class="r-track" cx="50" cy="50" r="44"/><circle class="r-win" id="c1-win" cx="50" cy="50" r="44"/><circle class="r-prog" id="c1-prog" cx="50" cy="50" r="44"/></svg>
+            <div class="t"><span id="c1-time">00:00</span><small id="c1-lab">próxima</small></div>
+          </div>
+          <div class="ck-data">
+            <div class="lbl">Probabilidad de parto</div>
+            <div class="big" id="prob">0%</div>
+            <div class="bar"><i id="probBar"></i><u></u></div>
+            <div class="lbl">Dolor <b id="painTxt" style="color:var(--text)">0/10</b></div>
+            <div class="bar pain"><i id="painBar"></i></div>
+          </div>
+        </div>
+      </section>
+      <section class="clock panel" id="clk2">
+        <div class="ck-head"><span class="ck-tag">Cronómetro 2</span><span class="ck-sub">Alarma de emergencia</span></div>
+        <div class="ck-body">
+          <div class="ring">
+            <svg viewBox="0 0 100 100"><circle class="r-track" cx="50" cy="50" r="44"/><circle class="r-prog" id="c2-prog" cx="50" cy="50" r="44"/></svg>
+            <div class="t"><span id="c2-time">OK</span><small id="c2-lab">estable</small></div>
+          </div>
+          <div class="ck-data"><div id="em-txt">Sin alarmas. Vigila las constantes.</div></div>
+        </div>
+      </section>
+      <section id="actions" class="panel">
+        <div class="row">
+          <button class="btn move" id="btnMove" type="button">Trasladar a paritorio <kbd>M</kbd></button>
+          <button class="btn push" id="btnPush" type="button">¡Pujar! <kbd>Espacio</kbd></button>
+        </div>
+        <div class="row">
+          <button class="btn tr" data-t="oxigeno" type="button"><i class="dot"></i>Oxígeno<small>Q</small></button>
+          <button class="btn tr" data-t="oxitocina" type="button"><i class="dot"></i>Oxitocina<small>W</small></button>
+          <button class="btn tr" data-t="suero" type="button"><i class="dot"></i>Suero<small>E</small></button>
+          <button class="btn tr" data-t="epidural" type="button"><i class="dot"></i>Epidural<small>R</small></button>
+        </div>
+        <div class="legend">Bebé con latidos bajos → Oxígeno · Hemorragia → Oxitocina · Presión baja → Suero · Dolor rojo → Epidural. El punto de cada botón es su semáforo: verde seguro, ámbar precaución, rojo no darlo.</div>
+      </section>
+    </footer>
+    <aside id="side" class="panel" aria-label="Historial y semáforos">
+      <div class="sd-head"><span class="ck-tag">Historial clínico</span><button id="sdClose" type="button" aria-label="Cerrar ficha">×</button></div>
+      <div id="hist"></div>
+      <div class="tl" id="tlPain">
+        <div class="tl-title">Semáforo de dolor</div>
+        <div class="tl-body">
+          <div class="lamps"><i></i><i></i><i></i></div>
+          <div class="tl-read"><b id="tlNum">0/10</b><span id="tlTxt">Leve</span><small id="tlTime">—</small></div>
+        </div>
+      </div>
+      <div class="tl">
+        <div class="tl-title">Semáforo de medicación</div>
+        <div id="tlMed"></div>
+      </div>
+      <div class="tl">
+        <div class="tl-title">Equipo de guardia · turno de noche</div>
+        <div id="crew"></div>
+      </div>
+    </aside>
+  </div>
+  <div id="overlay">
+    <div class="card" id="ovcard"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
+<script>
+(()=>{
+"use strict";
+const $=s=>document.querySelector(s);
+const rand=(a,b)=>a+Math.random()*(b-a);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const V=THREE.Vector3;
+const fmt=s=>{s=Math.max(0,Math.ceil(s));return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')};
+
+/* ============ AUDIO (todo sintetizado) ============ */
+const AU={ctx:null,on:true,master:null,noise:null,voice_es:null,
+  init(){
+    if(this.ctx)return;
+    const C=window.AudioContext||window.webkitAudioContext; if(!C)return;
+    this.ctx=new C(); this.master=this.ctx.createGain(); this.master.gain.value=.9; this.master.connect(this.ctx.destination);
+    const len=this.ctx.sampleRate; const b=this.ctx.createBuffer(1,len,this.ctx.sampleRate); const d=b.getChannelData(0);
+    for(let i=0;i<len;i++)d[i]=Math.random()*2-1; this.noise=b;
+    try{const pick=()=>{this.voice_es=(speechSynthesis.getVoices()||[]).find(v=>/^es/i.test(v.lang))||null};pick();speechSynthesis.onvoiceschanged=pick;}catch(e){}
+  },
+  resume(){if(this.ctx&&this.ctx.state==='suspended')this.ctx.resume()},
+  ok(){return this.on&&this.ctx},
+  out(pan){const g=this.ctx.createGain(); if(this.ctx.createStereoPanner){const p=this.ctx.createStereoPanner();p.pan.value=clamp(pan||0,-1,1);g.connect(p);p.connect(this.master)}else g.connect(this.master);return g},
+  tone(f,dur,type,vol,delay,pan,slide){
+    if(!this.ok())return; const t=this.ctx.currentTime+(delay||0);
+    const o=this.ctx.createOscillator(),g=this.ctx.createGain(); o.type=type||'sine'; o.frequency.setValueAtTime(f,t);
+    if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(30,f*slide),t+dur);
+    g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(vol||.1,t+.012); g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+    o.connect(g); g.connect(this.out(pan)); o.start(t); o.stop(t+dur+.05);
+  },
+  voice(o){
+    if(!this.ok())return; const f0=o.f0||220,dur=o.dur||1.2,vol=(o.vol||.3)*3,t=this.ctx.currentTime+(o.delay||0);
+    const F={a:[800,1250,2600],o:[500,900,2500],e:[500,1900,2600],u:[320,800,2400],m:[280,1000,2200]}[o.vowel||'a'];
+    const osc=this.ctx.createOscillator(); osc.type='sawtooth'; osc.frequency.setValueAtTime(f0,t); osc.frequency.linearRampToValueAtTime(f0*(o.glide||.8),t+dur);
+    const lfo=this.ctx.createOscillator(); lfo.frequency.value=o.vib||5.5; const lg=this.ctx.createGain(); lg.gain.value=f0*.03; lfo.connect(lg); lg.connect(osc.frequency);
+    const env=this.ctx.createGain(); env.gain.setValueAtTime(.0001,t); env.gain.exponentialRampToValueAtTime(vol,t+dur*.25); env.gain.setValueAtTime(vol,t+dur*.6); env.gain.exponentialRampToValueAtTime(.0001,t+dur);
+    env.connect(this.out(o.pan));
+    F.forEach((fr,i)=>{const bp=this.ctx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=fr;bp.Q.value=i?8:6;const g=this.ctx.createGain();g.gain.value=[1,.6,.25][i];osc.connect(bp);bp.connect(g);g.connect(env)});
+    if(o.breath>0){const n=this.ctx.createBufferSource();n.buffer=this.noise;n.loop=true;const bp=this.ctx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=F[1];bp.Q.value=1.1;const g=this.ctx.createGain();g.gain.value=o.breath;n.connect(bp);bp.connect(g);g.connect(env);n.start(t);n.stop(t+dur+.05)}
+    osc.start(t);lfo.start(t);osc.stop(t+dur+.05);lfo.stop(t+dur+.05);
+  },
+  groan(p,inten,delay,strong){
+    const near=p===sel?1:.45; const pan=(p.bed.g.position.x)/9;
+    this.voice({f0:p.pitch*(1+.18*inten),dur:.9+1.5*inten+(strong?.5:0),vol:(.16+.2*inten)*near*(strong?1.3:1),pan,vowel:inten>.55?'a':'o',glide:.74,breath:.25+.2*inten,vib:5+3*inten,delay:delay||0});
+    if(inten>.7)this.voice({f0:p.pitch*.8,dur:1.1,vol:.16*near,pan,vowel:'u',glide:.9,breath:.3,delay:(delay||0)+1.2});
+  },
+  cry(){for(let i=0;i<4;i++)this.voice({f0:520+i*20,dur:.55,vol:.28,vowel:'a',glide:.72,vib:8,breath:.12,delay:i*.75,pan:.3})},
+  beep(){this.tone(920,.07,'sine',.09)},
+  siren(k){this.tone(k?980:740,.36,'square',.045)},
+  chime(){[523,659,784,1046].forEach((f,i)=>this.tone(f,.35,'triangle',.12,i*.09))},
+  buzz(){this.tone(150,.35,'sawtooth',.12,0,0,.6)},
+  click(){this.tone(500,.06,'square',.05)},
+  speak(t,pitch){
+    if(!this.on||!this.ctx||!('speechSynthesis' in window))return;
+    try{const u=new SpeechSynthesisUtterance(t);u.lang='es-ES';u.pitch=pitch||1;u.rate=1.08;u.volume=.9;if(this.voice_es)u.voice=this.voice_es;speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}
+  }
+};
+
+/* ============ ESCENA ============ */
+const canvas=$('#c');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputEncoding=THREE.sRGBEncoding; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.1;
+const scene=new THREE.Scene(); scene.background=new THREE.Color(0x0b1a21); scene.fog=new THREE.Fog(0x0b1a21,28,60);
+const camera=new THREE.PerspectiveCamera(48,1,.1,120);
+
+const M=(c,r,m)=>new THREE.MeshStandardMaterial({color:c,roughness:r==null?.7:r,metalness:m||0});
+const sph=r=>new THREE.SphereGeometry(r,22,16);
+const cap=(r,l)=>new THREE.CapsuleGeometry(r,l,6,14);
+function mk(geo,mat,x,y,z,par,sx,sy,sz){const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);if(sx!=null)m.scale.set(sx,sy,sz);m.castShadow=true;m.receiveShadow=true;(par||scene).add(m);return m}
+function box(w,h,d,mat,x,y,z,par){return mk(new THREE.BoxGeometry(w,h,d),mat,x,y,z,par)}
+
+scene.add(new THREE.HemisphereLight(0xdff6ff,0x3a5560,.85));
+const sun=new THREE.DirectionalLight(0xffffff,.55); sun.position.set(-4,12,8); sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048); const sc=sun.shadow.camera; sc.left=-13;sc.right=13;sc.top=9;sc.bottom=-9;sc.near=1;sc.far=34; sun.shadow.bias=-.0005; scene.add(sun);
+const lampL=new THREE.PointLight(0xdff8ff,.55,16); lampL.position.set(-4,3.2,0); scene.add(lampL);
+const lampR=new THREE.PointLight(0xfff4e6,.55,16); lampR.position.set(4.6,3.2,0); scene.add(lampR);
+const spot=new THREE.SpotLight(0xfff6e8,1.1,10,.55,.5,1); spot.position.set(4.6,3.2,-1.4); spot.target.position.set(4.6,.7,-2.3); scene.add(spot,spot.target);
+
+function tileTex(c1,c2,rx,ry){
+  const c=document.createElement('canvas');c.width=c.height=256;const x=c.getContext('2d');
+  x.fillStyle=c1;x.fillRect(0,0,256,256);
+  for(let i=0;i<900;i++){x.fillStyle='rgba(255,255,255,'+(Math.random()*.035)+')';x.fillRect(Math.random()*256,Math.random()*256,3,3)}
+  x.strokeStyle=c2;x.lineWidth=4;
+  for(let i=0;i<=256;i+=128){x.beginPath();x.moveTo(i,0);x.lineTo(i,256);x.stroke();x.beginPath();x.moveTo(0,i);x.lineTo(256,i);x.stroke()}
+  const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(rx,ry);t.encoding=THREE.sRGBEncoding;t.anisotropy=4;return t;
+}
+function labelTex(text,w,h,bg,fg,font){
+  const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');
+  x.fillStyle=bg;x.fillRect(0,0,w,h);x.fillStyle=fg;x.font=font;x.textAlign='center';x.textBaseline='middle';x.fillText(text,w/2,h/2+2);
+  const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;t.anisotropy=4;return t;
+}
+function sign(text,x,y,z,w,h,bg,fg){
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:labelTex(text,512,Math.round(512*h/w),bg,fg,'700 '+Math.round(512*h/w*.5)+'px "Barlow Semi Condensed",Arial Narrow,sans-serif')}));
+  m.position.set(x,y,z);scene.add(m);return m;
+}
+
+// suelos
+const floorL=new THREE.Mesh(new THREE.PlaneGeometry(9,9.4),new THREE.MeshStandardMaterial({map:tileTex('#c9dce2','#a8c0c8',3.75,3.9),roughness:.55}));
+floorL.rotation.x=-Math.PI/2;floorL.position.set(-4.5,0,0);floorL.receiveShadow=true;scene.add(floorL);
+const floorR=new THREE.Mesh(new THREE.PlaneGeometry(9,9.4),new THREE.MeshStandardMaterial({map:tileTex('#cfe6d8','#a9ccb9',3.75,3.9),roughness:.55}));
+floorR.rotation.x=-Math.PI/2;floorR.position.set(4.5,0,0);floorR.receiveShadow=true;scene.add(floorR);
+// camino de traslado
+const pathMat=new THREE.MeshBasicMaterial({color:0xffc24d,transparent:true,opacity:.55});
+const pathStrip=new THREE.Mesh(new THREE.PlaneGeometry(13,.14),pathMat);pathStrip.rotation.x=-Math.PI/2;pathStrip.position.set(-1,.012,1.9);scene.add(pathStrip);
+// paredes
+const wallM=M(0xe3f0f0,.9),wainM=M(0x3a8f9a,.8),trimM=M(0x9bb6bd,.7);
+box(18.4,3.4,.2,wallM,0,1.7,-4.7);
+box(18.2,1.05,.06,wainM,0,.52,-4.57);
+box(.2,3.4,9.4,wallM,-9.1,1.7,0);box(.2,3.4,9.4,wallM,9.1,1.7,0);
+box(.2,3.4,5.2,wallM,0,1.7,-2.0);box(.2,3.4,.8,wallM,0,1.7,4.2);box(.2,.9,3.2,wallM,0,2.95,2.2);
+box(.26,.08,9,trimM,0,.04,0).visible=false;
+sign('SALA DE DILATACIÓN',-4,3.05,-4.58,3.8,.5,'#1d6f7a','#eaffff');
+sign('PARITORIO',4.6,3.05,-4.58,2.6,.5,'#2e8a63','#effff6');
+sign('CAMA 1',SLOTSX(0),2.75,-4.58,1.0,.3,'#e3f0f0','#1d6f7a');
+sign('CAMA 2',SLOTSX(1),2.75,-4.58,1.0,.3,'#e3f0f0','#1d6f7a');
+function SLOTSX(i){return [-5.5,-2.5,4.6][i]}
+
+// alarma luminosa
+function makeLamp(x){
+  const g=new THREE.Group();g.position.set(x,3.0,-4.5);
+  const base=mk(new THREE.CylinderGeometry(.14,.16,.08,16),M(0x333a3d,.5,.4),0,0,0,g);
+  const dome=mk(new THREE.SphereGeometry(.14,16,10,0,Math.PI*2,0,Math.PI/2),new THREE.MeshStandardMaterial({color:0x661118,emissive:0x000000,roughness:.3}),0,.04,0,g);
+  const l=new THREE.PointLight(0xff2a3a,0,7);l.position.set(0,.2,.4);g.add(l);scene.add(g);
+  return {dome,l};
+}
+const lampA=makeLamp(-.9),lampB=makeLamp(.9);
+
+// equipamiento paritorio
+(function(){
+  const steel=M(0xc5ced2,.35,.6),white=M(0xf4f7f8,.5);
+  // cuna térmica
+  box(.9,.08,.7,steel,7.4,.9,-3.4);box(.06,.9,.06,steel,7.0,.45,-3.1);box(.06,.9,.06,steel,7.8,.45,-3.1);box(.06,.9,.06,steel,7.0,.45,-3.7);box(.06,.9,.06,steel,7.8,.45,-3.7);
+  box(.8,.12,.6,M(0x9ed7e6,.5),7.4,.99,-3.4);
+  box(1.0,.06,.8,white,7.4,2.0,-3.4);box(.05,1.0,.05,steel,7.4,1.5,-3.9);
+  const warm=new THREE.PointLight(0xffb070,.5,3);warm.position.set(7.4,1.8,-3.4);scene.add(warm);
+  // carro instrumental
+  box(.8,.06,.5,steel,2.2,.85,-4.0);box(.05,.85,.05,steel,1.85,.42,-4.2);box(.05,.85,.05,steel,2.55,.42,-4.2);box(.05,.85,.05,steel,1.85,.42,-3.8);box(.05,.85,.05,steel,2.55,.42,-3.8);
+  box(.5,.03,.3,white,2.2,.9,-4.0);
+  // lampara cialitica
+  const g=new THREE.Group();g.position.set(4.6,3.15,-1.7);scene.add(g);
+  mk(new THREE.CylinderGeometry(.55,.55,.08,28),M(0xe8eef0,.4,.3),0,0,0,g);
+  mk(new THREE.CylinderGeometry(.42,.42,.02,28),new THREE.MeshStandardMaterial({color:0xfff7e0,emissive:0xfff2cc,emissiveIntensity:1.2}),0,-.05,0,g);
+})();
+// carteles pared lateral y reloj
+(function(){
+  const c=document.createElement('canvas');c.width=c.height=256;const x=c.getContext('2d');
+  x.fillStyle='#f4f7f8';x.beginPath();x.arc(128,128,124,0,7);x.fill();x.strokeStyle='#223';x.lineWidth=8;x.stroke();
+  x.lineWidth=5;for(let i=0;i<12;i++){const a=i/12*6.283;x.beginPath();x.moveTo(128+Math.sin(a)*100,128-Math.cos(a)*100);x.lineTo(128+Math.sin(a)*115,128-Math.cos(a)*115);x.stroke()}
+  x.lineWidth=9;x.beginPath();x.moveTo(128,128);x.lineTo(128+Math.sin(2.2)*60,128-Math.cos(2.2)*60);x.stroke();x.lineWidth=6;x.beginPath();x.moveTo(128,128);x.lineTo(128+Math.sin(5.1)*88,128-Math.cos(5.1)*88);x.stroke();
+  const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;
+  const m=new THREE.Mesh(new THREE.CircleGeometry(.3,32),new THREE.MeshBasicMaterial({map:t}));m.position.set(-8.9,2.5,-4.57);scene.add(m);
+})();
+
+/* ============ MONITORES ============ */
+const monitors=[];
+function makeMonitor(x,title){
+  const cv=document.createElement('canvas');cv.width=320;cv.height=190;const ctx=cv.getContext('2d');
+  const tex=new THREE.CanvasTexture(cv);tex.encoding=THREE.sRGBEncoding;
+  const g=new THREE.Group();g.position.set(x,2.05,-4.5);scene.add(g);
+  box(1.3,.82,.08,M(0x1b2328,.5,.3),0,0,0,g);
+  const scr=new THREE.Mesh(new THREE.PlaneGeometry(1.2,.71),new THREE.MeshBasicMaterial({map:tex}));scr.position.z=.045;g.add(scr);
+  const tl=new THREE.Group();tl.position.set(x+.98,2.05,-4.5);scene.add(tl);
+  box(.34,.92,.1,M(0x11181b,.5,.3),0,0,0,tl);
+  const lamps=[0x3be08a,0xffc24d,0xff4155].map((c,i)=>{const mt=new THREE.MeshStandardMaterial({color:c,emissive:c,emissiveIntensity:.05,roughness:.3});const s=new THREE.Mesh(new THREE.SphereGeometry(.11,16,12),mt);s.position.set(0,-.28+i*.28,.07);tl.add(s);return mt});
+  const m={lamps,cv,ctx,tex,buf:new Array(130).fill(0),tbuf:new Array(130).fill(0),phase:0,acc:0,bpm:142,alarm:false,active:false,title,name:'',pain:0,blink:0};
+  monitors.push(m);return m;
+}
+makeMonitor(-5.5,'CAMA 1');makeMonitor(-2.5,'CAMA 2');makeMonitor(4.6,'PARITORIO');
+function drawMon(m,dt,t){
+  m.acc+=dt;if(m.acc<1/14)return;const step=m.acc;m.acc=0;
+  const c=m.ctx,W=320,H=190;
+  c.fillStyle='#031210';c.fillRect(0,0,W,H);
+  c.strokeStyle='rgba(60,200,150,.12)';c.lineWidth=1;for(let i=0;i<W;i+=20){c.beginPath();c.moveTo(i,0);c.lineTo(i,H);c.stroke()}for(let j=0;j<H;j+=20){c.beginPath();c.moveTo(0,j);c.lineTo(W,j);c.stroke()}
+  c.font='600 17px "Barlow Semi Condensed",Arial,sans-serif';c.textBaseline='top';
+  c.fillStyle='#8fd9c4';c.fillText(m.title+(m.active?' · '+m.name.toUpperCase():''),10,8);
+  if(m.active){c.fillStyle='#ffc24d';c.fillText('T '+m.clock,248,40)}
+  if(!m.active){c.fillStyle='#3d6a60';c.font='700 24px "Barlow Semi Condensed",Arial,sans-serif';c.fillText('SIN PACIENTE',90,80);m.tex.needsUpdate=true;return}
+  m.phase+=step*m.bpm/60;const p=m.phase%1;let v=0;
+  if(p<.05)v=.9*Math.sin(p/.05*Math.PI);else if(p>.13&&p<.24)v=.28*Math.sin((p-.13)/.11*Math.PI);
+  m.buf.push(v+(Math.random()-.5)*.03);m.buf.shift();m.tbuf.push(m.pain);m.tbuf.shift();
+  const col=m.alarm?'#ff4a5a':'#38f2b0';
+  c.strokeStyle=col;c.lineWidth=2;c.beginPath();
+  for(let i=0;i<m.buf.length;i++){const x=i*(W/m.buf.length),y=88-m.buf[i]*48;i?c.lineTo(x,y):c.moveTo(x,y)}c.stroke();
+  c.strokeStyle='#ffc24d';c.lineWidth=2;c.beginPath();
+  for(let i=0;i<m.tbuf.length;i++){const x=i*(W/m.tbuf.length),y=178-m.tbuf[i]*52;i?c.lineTo(x,y):c.moveTo(x,y)}c.stroke();
+  c.font='700 46px "Barlow Semi Condensed",Arial,sans-serif';c.fillStyle=col;c.fillText(String(Math.round(m.bpm)),12,30);
+  c.font='600 13px "Barlow Semi Condensed",Arial,sans-serif';c.fillStyle='#8fd9c4';c.fillText('LPM BEBÉ',84,48);
+  c.fillStyle='#ffc24d';c.fillText('CONTRACCIONES',10,108);
+  if(m.alarm&&Math.floor(t*3)%2===0){c.fillStyle='#ff4a5a';c.font='700 22px "Barlow Semi Condensed",Arial,sans-serif';c.fillText('¡ALARMA!',222,10);c.strokeStyle='#ff4a5a';c.lineWidth=5;c.strokeRect(2,2,W-4,H-4)}
+  m.tex.needsUpdate=true;
+}
+
+/* ============ PERSONAJES ============ */
+function makeHuman(o){
+  const root=new THREE.Group(),H={root};
+  const skin=M(o.skin,.5),hairM=M(o.hair||0x222222,.55),top=M(o.top,.85),bot=M(o.bottom||o.top,.85);
+  const shinM=o.bareShin?skin:bot;
+  const white=M(0xf3f6f7,.5);
+  // pelvis
+  mk(sph(.15),bot,0,-.02,0,root,1.15,.8,.9);
+  const spine=new THREE.Group();spine.position.y=.06;root.add(spine);H.spine=spine;
+  mk(cap(.145,.26),top,0,.22,0,spine,1.05,1,.78);
+  mk(sph(.16),top,0,.44,0,spine,1.08,.5,.72);
+  if(o.female){mk(sph(.07),top,-.075,.38,.1,spine,1,.9,.8);mk(sph(.07),top,.075,.38,.1,spine,1,.9,.8)}
+  if(o.pregnant){H.belly=mk(sph(.22),top,0,.17,.13,spine,1,.95,1.0)}
+  mk(new THREE.CylinderGeometry(.04,.046,.12,12),skin,0,.54,0,spine);
+  // cabeza
+  const head=new THREE.Group();head.position.set(0,.68,.01);spine.add(head);H.head=head;
+  mk(sph(.1),skin,0,0,0,head,.92,1.12,1.0);
+  mk(sph(.07),skin,0,-.06,.025,head,1.0,.9,.95);
+  mk(sph(.022),skin,-.092,-.005,-.005,head,.5,1,.8);mk(sph(.022),skin,.092,-.005,-.005,head,.5,1,.8);
+  mk(sph(.017),skin,0,-.012,.098,head,.9,1.1,1);
+  const eyeW=M(0xffffff,.3),iris=M(o.iris||0x3a2a1c,.3),eyes=[];
+  [-1,1].forEach(s=>{
+    mk(sph(.017),eyeW,s*.04,.018,.081,head,1,.8,.6);
+    mk(sph(.0095),iris,s*.04,.018,.089,head,1,1,.6);
+    const lid=mk(sph(.0185),skin,s*.04,.018,.083,head,1,.75,.7);lid.visible=false;eyes.push(lid);
+  });
+  H.lids=eyes;
+  const browM=M(o.hair||0x222222,.6);
+  H.browL=mk(new THREE.BoxGeometry(.036,.007,.01),browM,-.04,.05,.088,head);
+  H.browR=mk(new THREE.BoxGeometry(.036,.007,.01),browM,.04,.05,.088,head);
+  if(!o.mask){
+    H.mouth=mk(sph(.021),M(0x5a1418,.5),0,-.056,.082,head,1.15,.28,.5);
+    mk(sph(.021),M(0xc4686f,.45),0,-.047,.083,head,1.2,.22,.5);
+    mk(sph(.021),M(0xc4686f,.45),0,-.066,.081,head,1.1,.25,.5);
+  }
+  // pelo / gorro
+  if(o.cap){
+    const capM=M(o.cap,.7);
+    mk(sph(.108),capM,0,.03,-.012,head,.96,.92,1.03);
+    mk(new THREE.TorusGeometry(.098,.008,8,24),capM,0,.035,.0,head,1,1.02,1.05).rotation.x=Math.PI/2;
+    if(o.female){mk(sph(.05),capM,0,-.005,-.12,head,1,1,1);}
+  }else{
+    mk(sph(.106),hairM,0,.022,-.026,head,.98,1.0,1.0);
+    if(o.hairStyle==='bun')mk(sph(.05),hairM,0,.1,-.06,head);
+    if(o.hairStyle==='pony'){mk(cap(.03,.2),hairM,0,-.04,-.13,head).rotation.x=.25}
+    if(o.hairStyle==='long'){mk(cap(.075,.28),hairM,0,-.13,-.07,head,1.1,1,.7)}
+    if(o.hairStyle==='pony'||o.hairStyle==='bun'){mk(cap(.05,.16),hairM,0,-.1,-.08,head,1.1,1,.7)}
+  }
+  if(o.mask){
+    const mm=M(0x9fe2ee,.7);
+    mk(sph(.1),mm,0,-.05,.04,head,.9,.5,.82);
+    mk(sph(.1),mm,0,-.075,.03,head,.88,.4,.8);
+  }
+  if(o.glasses){
+    const gm=M(0x15191c,.4,.3);
+    [-1,1].forEach(s=>{const t=mk(new THREE.TorusGeometry(.024,.003,6,18),gm,s*.04,.018,.098,head);});
+    mk(new THREE.BoxGeometry(.03,.003,.003),gm,0,.022,.099,head);
+  }
+  // brazos
+  function arm(side){
+    const sh=new THREE.Group();sh.position.set(side*(o.female?.185:.215),.45,0);spine.add(sh);
+    mk(sph(.052),top,0,0,0,sh);
+    mk(cap(.045,.2),top,0,-.15,0,sh);
+    const el=new THREE.Group();el.position.y=-.3;sh.add(el);
+    mk(cap(.037,.18),skin,0,-.13,0,el);
+    mk(sph(.045),o.gloves?white:skin,0,-.29,0,el,.9,1.15,.7);
+    return {sh,el};
+  }
+  H.armL=arm(-1);H.armR=arm(1);
+  // piernas
+  const shoe=M(o.shoe||0xf1f1f1,.6);
+  function leg(side){
+    const hp=new THREE.Group();hp.position.set(side*.09,-.04,0);root.add(hp);
+    mk(cap(.078,.3),bot,0,-.23,0,hp);
+    const kn=new THREE.Group();kn.position.y=-.45;hp.add(kn);
+    mk(cap(.056,.3),shinM,0,-.22,0,kn);
+    mk(sph(.06),o.bareShin?skin:shoe,0,-.44,.045,kn,1,.7,1.8);
+    return {hp,kn};
+  }
+  H.legL=leg(-1);H.legR=leg(1);
+  return H;
+}
+
+function makeBed(){
+  const g=new THREE.Group();
+  const steel=M(0xb7c3c8,.4,.6),mat=M(0xf2f7f8,.7),pad=M(0x6fb7c9,.7);
+  box(1.0,.1,2.2,steel,0,.42,0,g);
+  box(.92,.14,1.3,mat,0,.54,.55,g);
+  box(.08,.08,1.7,steel,-.5,.58,.25,g);box(.08,.08,1.7,steel,.5,.58,.25,g);
+  const back=new THREE.Group();back.position.set(0,.62,.15);back.rotation.x=.55;g.add(back);
+  box(.92,.12,.95,mat,0,0,-.5,back);box(.5,.1,.3,M(0xffffff,.8),0,.1,-.8,back);
+  box(1.0,.62,.06,steel,0,.7,-1.1,g);box(1.0,.5,.06,steel,0,.65,1.1,g);
+  box(.04,.2,1.1,steel,-.52,.8,.45,g);box(.04,.2,1.1,steel,.52,.8,.45,g);
+  [[-.42,-.9],[.42,-.9],[-.42,.9],[.42,.9]].forEach(p=>{box(.05,.3,.05,steel,p[0],.22,p[1],g);mk(new THREE.CylinderGeometry(.075,.075,.06,14),M(0x222,.6),p[0],.075,p[1],g).rotation.z=Math.PI/2});
+  // suero
+  const pole=box(.03,1.5,.03,steel,.78,.85,-.7,g);box(.3,.03,.03,steel,.78,1.6,-.7,g);
+  mk(new THREE.BoxGeometry(.14,.22,.04),new THREE.MeshStandardMaterial({color:0xaee6ff,transparent:true,opacity:.75,roughness:.2}),.78,1.45,-.7,g);
+  box(.5,.03,.5,steel,.78,.12,-.7,g);
+  // icono emergencia
+  const c=document.createElement('canvas');c.width=c.height=128;const x=c.getContext('2d');
+  x.fillStyle='#ff3345';x.beginPath();x.arc(64,64,58,0,7);x.fill();x.strokeStyle='#fff';x.lineWidth=6;x.stroke();
+  x.fillStyle='#fff';x.font='700 84px Arial';x.textAlign='center';x.textBaseline='middle';x.fillText('!',64,70);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false,transparent:true}));
+  sp.scale.set(.8,.8,.8);sp.position.set(0,2.5,0);sp.visible=false;sp.renderOrder=10;g.add(sp);
+  return {g,sprite:sp,path:[],speed:5};
+}
+
+/* Personajes */
+const PROFILES=[
+  {name:'Marta',skin:0xd9a07c,hair:0x3a2416,gown:0x9fd4f0,style:'bun'},
+  {name:'Lucía',skin:0x8d5a3b,hair:0x120c0a,gown:0xf2a6c0,style:'pony'},
+  {name:'Carmen',skin:0xf1c9a8,hair:0xa5622a,gown:0xc6b5ee,style:'long'},
+  {name:'Sofía',skin:0xc68a62,hair:0x2b1a12,gown:0xa8e0c4,style:'bun'},
+  {name:'Irene',skin:0xe8b996,hair:0x6b3a1e,gown:0xf6d28a,style:'long'},
+  {name:'Noa',skin:0x7a4a30,hair:0x0e0907,gown:0x9fc4f4,style:'pony'}
+];
+const docs=[];
+function makeDoc(cfg){
+  const h=makeHuman({skin:cfg.skin,top:cfg.scrub,bottom:cfg.pants,cap:cfg.cap,mask:true,female:cfg.female,glasses:cfg.glasses,gloves:true,shoe:0xffffff,hair:cfg.hair});
+  h.root.position.set(cfg.x,.97,cfg.z);scene.add(h.root);
+  h.head.add(nameTag(cfg.name));
+  // bata encima (blanca) simple
+  const baby=new THREE.Group();baby.visible=false;
+  mk(cap(.09,.22),M(0xfff1c9,.8),0,0,0,baby).rotation.z=1.45;
+  mk(sph(.075),M(0xf2b79e,.5),-.2,0,0,baby);
+  baby.position.set(0,.3,.3);h.spine.add(baby);h.baby=baby;
+  const d={h,name:cfg.name,title:cfg.title,pos:new V(cfg.x,0,cfg.z),path:[],goal:new V(1e9,0,0),walk:0,moving:false,role:cfg.role,seed:Math.random()*9};
+  docs.push(d);return d;
+}
+function nameTag(name){
+  const c=document.createElement('canvas');c.width=360;c.height=120;const x=c.getContext('2d');
+  x.fillStyle='rgba(110,15,44,.94)';x.fillRect(4,4,352,112);x.strokeStyle='#3fd6bd';x.lineWidth=4;x.strokeRect(4,4,352,112);
+  x.fillStyle='#e8f5f2';x.font='700 42px "Barlow Semi Condensed",Arial,sans-serif';x.textAlign='center';x.fillText(name.toUpperCase(),180,54);
+  x.fillStyle='#3be08a';x.beginPath();x.arc(70,88,9,0,7);x.fill();
+  x.fillStyle='#3fd6bd';x.font='700 28px "Barlow Semi Condensed",Arial,sans-serif';x.fillText('DE GUARDIA',200,98);
+  const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:t,depthTest:false,transparent:true}));
+  sp.scale.set(.9,.3,1);sp.position.set(0,.36,0);sp.renderOrder=9;return sp;
+}
+const docA=makeDoc({name:'Dra. Elena',title:'Obstetra jefa de guardia',role:0,x:-4,z:1.5,skin:0xe3b08c,scrub:0x8c1237,pants:0x6e0f2c,cap:0x7a0f2e,female:true,hair:0x3a2416});
+const docB=makeDoc({name:'Dra. Laura',title:'Obstetra de guardia',role:1,x:-3,z:1.5,skin:0xb97a52,scrub:0x8c1237,pants:0x6e0f2c,cap:0x7a0f2e,female:true,glasses:true,hair:0x1a1210});
+
+/* ============ ESTADO DEL JUEGO ============ */
+const SLOT_X=[-5.5,-2.5,4.6],BZ=-2.3;
+const G={run:false,score:0,lives:3,births:0,goal:6,combo:0,t:0};
+let patients=[],beds=[],sel=null,pending=[],nameIdx=Math.floor(Math.random()*6),shownEnd=false;
+const EM={active:false,p:null,type:null,t:0,max:14,next:18};
+const EMTYPES={
+  fetal:{txt:'Latidos del bebé muy bajos',cure:'oxigeno',say:'¡Alarma! Latidos del bebé muy bajos.'},
+  sangrado:{txt:'Hemorragia',cure:'oxitocina',say:'¡Alarma! Hay hemorragia.'},
+  presion:{txt:'Presión arterial baja, mareo',cure:'suero',say:'¡Alarma! La presión está bajando.'}
+};
+const CURE_NAME={oxigeno:'oxígeno',oxitocina:'oxitocina',suero:'suero'};
+
+let toastT=0;
+function note(t,kind){const el=$('#toast');el.textContent=t;el.className='show '+(kind||'');clearTimeout(toastT);toastT=setTimeout(()=>{el.className=''},3400)}
+function say(t,kind,who){note((who==='m'?'Dra. Laura: ':'Dra. Elena: ')+t,kind);AU.speak(t,who==='m'?1:1.25)}
+function logEv(p,x){if(p&&p.log)p.log.push({t:fmt(G.t),x})}
+
+function spawnPatient(slot,instant,labor){
+  const prof=PROFILES[nameIdx++%PROFILES.length];
+  const human=makeHuman({skin:prof.skin,hair:prof.hair,top:prof.gown,bottom:prof.gown,female:true,pregnant:true,hairStyle:prof.style,bareShin:true});
+  const bed=makeBed();bed.g.add(human.root);
+  human.root.position.set(0,.78,.23);human.root.rotation.x=-1.02;
+  const p={name:prof.name,slot,human,bed,state:instant?'wait':'arriving',labor:labor!=null?labor:rand(12,45),rate:rand(.85,1.3)*(1+G.births*.05),
+    nextC:rand(1,4),interval:rand(9,12),dur:6.5,contr:false,cT:0,pain:0,pushes:0,pushed:false,grace:0,emerg:null,
+    seed:Math.random()*10,pitch:rand(195,250),lastG:-9,winSaid:false,blink:0,hist:makeHist(),log:[],epi:false,t0:G.t};
+  bed.p=p;logEv(p,instant?'Ingresa en dilatación':'Ingresa en urgencias');
+  const sx=SLOT_X[slot];
+  if(instant){bed.g.position.set(sx,0,BZ)}
+  else{bed.g.position.set(sx,0,10);bed.path=[new V(sx,0,BZ)];bed.speed=5;bed.done=()=>{p.state='wait'}}
+  scene.add(bed.g);bed.g.traverse(o=>{o.userData.bed=bed});
+  beds.push(bed);patients.push(p);return p;
+}
+function removePatient(p){scene.remove(p.bed.g);patients=patients.filter(q=>q!==p);beds=beds.filter(b=>b!==p.bed);if(sel===p)sel=null}
+const alive=()=>patients.filter(p=>p.state==='wait'||p.state==='moving');
+function pickDefaultSel(){
+  if(sel&&patients.includes(sel))return;
+  const a=alive().sort((x,y)=>y.labor-x.labor);sel=a[0]||patients[0]||null;
+}
+function select(p){if(!p||!patients.includes(p))return;sel=p;cam.mode='close';AU.click();$('#btnView').textContent='Vista general'}
+function bySlot(s){return patients.find(p=>p.slot===s&&p.state!=='gone')}
+
+function loseLife(msg){
+  G.lives--;G.combo=0;note(msg,'bad');AU.buzz();renderLives();
+  if(G.lives<=0)endGame(false);
+}
+function addScore(n){G.score+=n}
+
+function requestMove(){
+  const p=sel;if(!G.run||!p)return;
+  if(p.slot===2){note('Ya está en el paritorio.','warn');return}
+  if(p.state!=='wait'){note('Espera a que la paciente esté en su cama.','warn');return}
+  if(patients.some(q=>q.slot===2)){note('El paritorio está ocupado.','warn');AU.buzz();return}
+  const better=alive().find(q=>q!==p&&q.slot<2&&q.labor>p.labor+10);
+  const old=p.slot,sx=p.bed.g.position.x;
+  if(better){addScore(-30);G.combo=0;note(better.name+' estaba más cerca del parto ('+Math.round(better.labor)+'%). −30','bad');AU.buzz()}
+  else if(p.labor>=55){addScore(20);note('Buena decisión: era la más cercana al parto. +20','good');AU.chime()}
+  else{note('Es la más adelantada, pero aún le falta dilatación.','warn')}
+  p.slot=2;p.state='moving';logEv(p,'Traslado al paritorio ('+Math.round(p.labor)+'%)');
+  p.bed.speed=5;p.bed.path=[new V(sx,0,1.9),new V(4.6,0,1.9),new V(4.6,0,BZ)];
+  p.bed.done=()=>{p.state='wait';p.contr=false;p.cT=0;p.pain=0;p.nextC=2;p.pushes=0;p.dur=5.4;p.interval=2.6;p.grace=0;say('Ya estamos en paritorio. Respire, esperen la contracción.','good')};
+  pending.push({slot:old,t:4.5});
+  AU.speak('¡Al paritorio, rápido!',1.2);
+}
+
+function push(){
+  const p=sel;if(!G.run||!p)return;
+  if(p.slot!==2||p.state!=='wait'){note('Solo se puja en el paritorio.','warn');AU.buzz();return}
+  if(p.labor<85){note('Aún no hay dilatación completa (necesita 85%).','warn');AU.buzz();return}
+  if(!p.contr){note('Descansa. Pujar sin contracción cansa a la madre.','warn');addScore(-5);G.combo=0;AU.buzz();return}
+  if(p.pushed){note('Ya has pujado en esta contracción.','warn');return}
+  const ph=p.cT/p.dur;
+  if(ph>=.3&&ph<=.72){
+    p.pushed=true;p.pushes++;logEv(p,'Pujo '+p.pushes+'/3');addScore(25+G.combo*5);G.combo++;AU.groan(p,1,0,true);AU.chime();
+    note('¡Pujo perfecto! '+p.pushes+'/3','good');
+    if(p.pushes>=3)birth(p,true);
+  }else{
+    p.pushed=true;G.combo=0;addScore(-5);AU.buzz();
+    note(ph<.3?'Demasiado pronto: espera la zona verde.':'Demasiado tarde: la contracción baja.','bad');
+  }
+}
+
+function birth(p,good){
+  p.state='birth';G.births++;logEv(p,'Nace el bebé');
+  if(EM.active&&EM.p===p)clearEmergency(false);
+  if(good){addScore(100+G.combo*20);G.combo++;note('¡Ha nacido! '+p.name+' y su bebé están bien. +100','good')}
+  else{loseLife(p.name+' ha dado a luz en la cama de dilatación.')}
+  AU.cry();AU.chime();AU.speak(good?'¡Ya está aquí! ¡Enhorabuena!':'¡El bebé ya viene!',1.2);
+  docA.h.baby.visible=true;
+  const bp=p.bed.g.position;burst(bp.x,1.2,bp.z);
+  renderStats();
+  setTimeout(()=>{
+    docA.h.baby.visible=false;p.state='leaving';
+    p.bed.speed=4.5;p.bed.path=[new V(p.bed.g.position.x,0,11)];
+    p.bed.done=()=>{removePatient(p);pickDefaultSel()};
+    if(p.slot<2)pending.push({slot:p.slot,t:2});
+    if(G.births>=G.goal&&G.lives>0)setTimeout(()=>endGame(true),900);
+  },4800);
+}
+
+/* ---- emergencias ---- */
+function startEmergency(){
+  const c=alive().filter(p=>p.state==='wait');if(!c.length){EM.next=3;return}
+  const p=c[Math.floor(Math.random()*c.length)];
+  const keys=p.hist.cond.includes('anemia')?['sangrado','sangrado','fetal','presion']:Object.keys(EMTYPES);const type=keys[Math.floor(Math.random()*keys.length)];
+  logEv(p,'ALARMA: '+EMTYPES[type].txt.toLowerCase());
+  EM.active=true;EM.p=p;EM.type=type;EM.max=Math.max(9,14-G.births*.7);EM.t=EM.max;p.emerg=type;
+  p.bed.sprite.visible=true;sel=p;cam.mode='close';
+  AU.speak(EMTYPES[type].say,1.2);
+  AU.groan(p,1,0,true);
+}
+function clearEmergency(){
+  if(EM.p){EM.p.emerg=null;EM.p.bed.sprite.visible=false}
+  EM.active=false;EM.p=null;EM.type=null;EM.next=rand(16,26);
+}
+function treat(kind){
+  if(!G.run)return;
+  if(kind==='epidural'){giveEpidural();return}
+  if(!EM.active){note('No hay alarma activa. No malgastes recursos.','warn');return}
+  if(sel!==EM.p){note('La alarma es de '+EM.p.name+'. Selecciónala.','warn');return}
+  if(EMTYPES[EM.type].cure===kind){
+    const ms=medState(EM.p,kind);let gain=50+Math.ceil(EM.t)*5+G.combo*5;if(ms.s==='caution')gain=Math.round(gain*.7);G.combo++;addScore(gain);
+    logEv(EM.p,'Alarma resuelta con '+CURE_NAME[kind]);
+    note('¡Estabilizada! '+EM.p.name+' responde bien al '+CURE_NAME[kind]+'. +'+gain+(ms.s==='caution'?' (precaución: '+ms.why.toLowerCase()+')':''),'good');AU.chime();AU.speak('Estable. Buen trabajo.',1.2);
+    clearEmergency();renderStats();
+  }else{
+    EM.t=Math.max(0,EM.t-3);G.combo=0;note('Tratamiento incorrecto. −3 segundos.','bad');AU.buzz();
+  }
+}
+
+/* ============ CÁMARA ============ */
+const cam={mode:'wide',yaw:0,pos:new V(0,9,13),look:new V(0,.5,-1.4),dragging:false,moved:0,aspect:1.7};
+function camTargets(){
+  if(cam.mode==='close'&&sel&&patients.includes(sel)){
+    const b=sel.bed.g.position;
+    const look=new V(b.x,.85,b.z+.1);
+    const d=cam.aspect<1?6.6:5.2;
+    const pos=new V(b.x+Math.sin(cam.yaw)*d,3.3,b.z+Math.cos(cam.yaw)*d);
+    return {pos,look};
+  }
+  const fov=camera.fov*Math.PI/180;
+  const dist=clamp(10.3/(Math.tan(fov/2)*cam.aspect),11.5,60);
+  return {pos:new V(cam.yaw*9,dist*.62,dist*.9),look:new V(0,.4,-1.6)};
+}
+function resize(){
+  const w=window.innerWidth,h=window.innerHeight;
+  renderer.setSize(w,h,false);cam.aspect=w/h;camera.aspect=cam.aspect;
+  const shift=w<760?h*.2:h*.12;
+  camera.setViewOffset(w,h,0,shift,w,h);camera.updateProjectionMatrix();
+}
+window.addEventListener('resize',resize);
+
+/* ============ ANIMACIÓN ============ */
+function animPatient(p,t){
+  const h=p.human,pain=p.pain,em=p.emerg?1:0;
+  const br=Math.sin(t*1.7+p.seed)*.5+.5;
+  const par=p.slot===2;
+  h.belly.scale.setScalar(1+.012*br+.055*pain);
+  h.spine.rotation.x=-.06*pain;
+  h.head.rotation.x=-.2*pain+Math.sin(t*.6+p.seed)*.04-.12*em;
+  h.head.rotation.z=Math.sin(t*6+p.seed)*.035*pain;
+  const open=Math.max(pain*.95,em*.6,.05+.04*br);
+  if(h.mouth){h.mouth.scale.y=.28+open*1.3;h.mouth.scale.x=1.15-open*.3}
+  p.blink-=1/60;if(p.blink<-3.2)p.blink=.14;
+  const closed=pain>.5||(p.blink>0);
+  h.lids.forEach(l=>l.visible=closed);
+  const furrow=pain*.45;
+  h.browL.rotation.z=-.1-furrow;h.browR.rotation.z=.1+furrow;
+  h.browL.position.y=h.browR.position.y=.05-.006*pain;
+  // brazos: manos sobre el vientre / agarre
+  const grip=pain;
+  h.armL.sh.rotation.x=-.25-.35*grip;h.armR.sh.rotation.x=-.25-.35*grip;
+  h.armL.sh.rotation.z=-.15-.35*grip;h.armR.sh.rotation.z=.15+.35*grip;
+  h.armL.el.rotation.x=-1.15-.2*grip;h.armR.el.rotation.x=-1.15-.2*grip;
+  // piernas
+  const spread=(par?.5:.28)+.14*pain;
+  h.legL.hp.rotation.set(-1.25-.1*pain,0,-spread);h.legR.hp.rotation.set(-1.25-.1*pain,0,spread);
+  h.legL.kn.rotation.x=1.25;h.legR.kn.rotation.x=1.25;
+  // vibración si está en emergencia
+  p.bed.sprite.scale.setScalar(.8+.1*Math.sin(t*10));
+}
+function buildPath(from,to){
+  const pts=[new V(from.x,0,2.4),new V(to.x,0,2.4),new V(to.x,0,to.z)];
+  return pts;
+}
+function spotFor(d,p){
+  const b=p.bed.g.position;
+  const side=d.role===0?-1:1;
+  return new V(b.x+side*1.05,0,b.z+.15);
+}
+function animDoc(d,dt,t){
+  const h=d.h;
+  let speed=2.4;
+  if(sel&&patients.includes(sel)){
+    const want=spotFor(d,sel);
+    if(sel.state==='moving'){d.path=[want];speed=6.4;d.goal.set(1e9,0,0)}
+    else if(d.goal.distanceTo(want)>.05){d.goal.copy(want);d.path=buildPath(d.pos,want);if(EM.active)speed=3.6}
+  }
+  if(EM.active)speed=3.8;
+  d.moving=false;
+  if(d.path.length){
+    const tg=d.path[0];const dv=tg.clone().sub(d.pos);dv.y=0;const L=dv.length();const st=speed*dt;
+    d.moving=true;
+    if(L<=st){d.pos.copy(tg);d.path.shift()}
+    else{d.pos.addScaledVector(dv,st/L);h.root.rotation.y=Math.atan2(dv.x,dv.z)}
+  }
+  h.root.position.x=d.pos.x;h.root.position.z=d.pos.z;
+  if(d.moving){
+    d.walk+=dt*(speed>5?13:8.5);const s=Math.sin(d.walk);
+    h.legL.hp.rotation.x=s*.55;h.legR.hp.rotation.x=-s*.55;
+    h.legL.kn.rotation.x=Math.max(0,s)*.8;h.legR.kn.rotation.x=Math.max(0,-s)*.8;
+    h.armL.sh.rotation.x=-s*.5;h.armR.sh.rotation.x=s*.5;h.armL.el.rotation.x=-.3;h.armR.el.rotation.x=-.3;
+    h.armL.sh.rotation.z=h.armR.sh.rotation.z=0;
+    h.root.position.y=.97+Math.abs(Math.cos(d.walk))*.025;h.spine.rotation.x=.08;
+  }else{
+    h.root.position.y=.97;
+    h.legL.hp.rotation.x=h.legR.hp.rotation.x=0;h.legL.kn.rotation.x=h.legR.kn.rotation.x=0;
+    if(sel&&patients.includes(sel)){
+      const b=sel.bed.g.position;h.root.rotation.y=Math.atan2(b.x-d.pos.x,b.z-d.pos.z);
+    }
+    h.spine.rotation.x=.12+Math.sin(t*1.5+d.seed)*.015;
+    const pain=sel?sel.pain:0;
+    if(h.baby.visible){
+      h.armL.sh.rotation.x=-1.15;h.armR.sh.rotation.x=-1.15;h.armL.el.rotation.x=-.7;h.armR.el.rotation.x=-.7;
+      h.armL.sh.rotation.z=.25;h.armR.sh.rotation.z=-.25;h.head.rotation.x=.25;
+    }else if(d.role===0){
+      h.armR.sh.rotation.x=-1.05+Math.sin(t*1.2)*.05;h.armR.el.rotation.x=-.55;h.armR.sh.rotation.z=.1;
+      h.armL.sh.rotation.x=-.2;h.armL.el.rotation.x=-.4;h.armL.sh.rotation.z=-.1;
+      h.head.rotation.x=.3;
+    }else{
+      h.armL.sh.rotation.x=-.65;h.armR.sh.rotation.x=-.65;h.armL.el.rotation.x=-1.0;h.armR.el.rotation.x=-1.0;
+      h.armL.sh.rotation.z=h.armR.sh.rotation.z=0;h.armR.sh.rotation.x+=Math.sin(t*2.2)*.12*(.4+pain);
+      h.head.rotation.x=.2+Math.sin(t*.8)*.06;
+    }
+  }
+}
+
+/* ============ PARTÍCULAS ============ */
+const conf={n:140,life:0,vel:new Float32Array(140*3)};
+(function(){
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(conf.n*3),3));
+  geo.setAttribute('color',new THREE.BufferAttribute(new Float32Array(conf.n*3),3));
+  conf.pts=new THREE.Points(geo,new THREE.PointsMaterial({size:.16,vertexColors:true,transparent:true,depthWrite:false}));
+  conf.pts.visible=false;conf.pts.frustumCulled=false;scene.add(conf.pts);
+})();
+function burst(x,y,z){
+  const pos=conf.pts.geometry.attributes.position,col=conf.pts.geometry.attributes.color;
+  const pal=[[1,.48,.6],[.25,.84,.74],[1,.76,.3],[.6,.75,1]];
+  for(let i=0;i<conf.n;i++){pos.setXYZ(i,x,y,z);conf.vel[i*3]=rand(-2.4,2.4);conf.vel[i*3+1]=rand(2.5,6.5);conf.vel[i*3+2]=rand(-2.4,2.4);col.setXYZ(i,...pal[i%4])}
+  pos.needsUpdate=true;col.needsUpdate=true;conf.pts.visible=true;conf.life=3.4;
+}
+function updConf(dt){
+  if(conf.life<=0)return;conf.life-=dt;
+  const pos=conf.pts.geometry.attributes.position;
+  for(let i=0;i<conf.n;i++){
+    conf.vel[i*3+1]-=7*dt;
+    pos.setXYZ(i,pos.getX(i)+conf.vel[i*3]*dt,Math.max(.02,pos.getY(i)+conf.vel[i*3+1]*dt),pos.getZ(i)+conf.vel[i*3+2]*dt);
+  }
+  pos.needsUpdate=true;if(conf.life<=0)conf.pts.visible=false;
+}
+
+/* ============ BUCLE ============ */
+let tAcc=0,hudAcc=0,beepAcc=0,sirenAcc=0,sirenK=0,time=0;
+function updBed(b,dt){
+  if(!b.path||!b.path.length)return;
+  const tg=b.path[0],pos=b.g.position;const dx=tg.x-pos.x,dz=tg.z-pos.z;const L=Math.hypot(dx,dz),st=b.speed*dt;
+  if(L<=st){pos.x=tg.x;pos.z=tg.z;b.path.shift();if(!b.path.length&&b.done){const f=b.done;b.done=null;f()}}
+  else{pos.x+=dx/L*st;pos.z+=dz/L*st}
+}
+function updPatient(p,dt,t){
+  if(p.state!=='wait'&&p.state!=='moving'){p.pain=0;return}
+  const par=p.slot===2;
+  if(!p.contr){
+    p.pain=Math.max(0,p.pain-dt*1.5);
+    p.nextC-=dt;
+    if(p.nextC<=0&&(G.run||true)){
+      p.contr=true;p.cT=0;p.winSaid=false;p.pushed=false;p.dur=par?5.4:6.5;
+      const inten=.45+.55*Math.min(1,p.labor/90);
+      AU.groan(p,inten,.35);
+      if(inten>.62)AU.groan(p,inten,p.dur*.55);
+    }
+  }else{
+    p.cT+=dt;const ph=p.cT/p.dur;
+    const inten=.45+.55*Math.min(1,p.labor/90);
+    p.pain=Math.pow(Math.sin(Math.PI*Math.min(1,ph)),1.4)*inten*(p.epi?.55:1);
+    if(par&&!p.winSaid&&ph>=.3&&G.run&&p===sel&&p.labor>=85){p.winSaid=true;say('¡Puje ahora!','good')}
+    if(ph>=1){p.contr=false;p.pain=0;p.nextC=par?rand(2.2,3):Math.max(5,rand(9,13)-p.labor*.04)}
+  }
+  if(G.run){
+    p.labor=Math.min(100,p.labor+(p.rate+(p.contr?p.rate*2.2*p.pain:0))*dt*.9*(p.epi?.92:1));
+    if(!par&&p.state==='wait'&&p.labor>=100){
+      p.grace+=dt;
+      if(p.grace>=12)birth(p,false);
+    }
+    if(p.emerg&&t-p.lastG>3.2){p.lastG=t;AU.groan(p,.8,0)}
+  }
+}
+function emergencyTick(dt){
+  if(!G.run)return;
+  if(!EM.active){EM.next-=dt;if(EM.next<=0)startEmergency()}
+  else{
+    EM.t-=dt;
+    if(EM.t<=0){const p=EM.p;clearEmergency();loseLife('No llegaste a tiempo con '+(p?p.name:'la paciente')+'. Pierdes una vida.')}
+  }
+}
+function updMonitors(dt,t){
+  monitors.forEach((m,i)=>{
+    const p=bySlot(i);
+    const ok=p&&(p.state==='wait'||p.state==='arriving'&&false);
+    m.active=!!(p&&p.state==='wait');
+    if(m.active){
+      m.name=p.name;m.pain=p.pain;m.alarm=!!p.emerg;
+      let bpm=142-14*p.pain+Math.sin(t*.7+i)*2;
+      if(p.emerg==='fetal')bpm=68+Math.sin(t*2)*4;else if(p.emerg==='sangrado')bpm=176;else if(p.emerg==='presion')bpm=118;
+      m.bpm=bpm;
+    }
+    m.clock=m.active?fmt(G.t-p.t0):'';
+    const lv=m.active?Math.round(p.pain*10):-1,fl=m.active&&p.emerg&&Math.sin(t*14)>0;
+    m.lamps[0].emissiveIntensity=(lv>=0&&lv<4&&!fl)?1.8:.05;
+    m.lamps[1].emissiveIntensity=(lv>=4&&lv<7&&!fl)?1.8:.05;
+    m.lamps[2].emissiveIntensity=(lv>=7||fl)?2:.05;
+    drawMon(m,dt,t);
+  });
+}
+function updLamps(t){
+  const pulse=EM.active?(Math.sin(t*10)*.5+.5):0;
+  const room=EM.active&&EM.p?(EM.p.slot===2?1:0):-1;
+  [[lampA,0],[lampB,1]].forEach(([l,r])=>{
+    const on=EM.active&&(room===r||true);
+    l.dome.material.emissive.setRGB(on?pulse:0,0,0);
+    l.l.intensity=on?pulse*1.6:0;
+  });
+  $('#vignette').classList.toggle('on',EM.active);
+}
+function updSpawns(dt){
+  pending=pending.filter(s=>{
+    if(!G.run)return true;
+    s.t-=dt;
+    if(s.t>0)return true;
+    if(!patients.some(p=>p.slot===s.slot))spawnPatient(s.slot,false,rand(8,38));
+    return false;
+  });
+}
+
+/* ============ HISTORIAL Y SEMÁFOROS ============ */
+const CONDS={cesarea:'Cesárea previa',hta:'Hipertensión gestacional',anemia:'Anemia',diabetes:'Diabetes gestacional',anticoag:'Anticoagulantes'};
+const ALLERGIES=['Ninguna conocida','Ninguna conocida','Ninguna conocida','Anestésicos locales','Penicilina','Látex'];
+const BLOODS=['A+','A−','B+','0+','0−','AB+'];
+const MEDS=[['oxigeno','Oxígeno'],['oxitocina','Oxitocina'],['suero','Suero'],['epidural','Epidural']];
+const medRows={};let histSig='';
+function makeHist(){
+  const emb=1+Math.floor(Math.random()*4),keys=Object.keys(CONDS),cond=[];
+  const n=Math.random()<.35?0:(Math.random()<.7?1:2);
+  while(cond.length<n){const k=keys[Math.floor(Math.random()*keys.length)];if(!cond.includes(k)&&!(k==='cesarea'&&emb===1))cond.push(k)}
+  return {age:22+Math.floor(Math.random()*18),weeks:37+Math.floor(Math.random()*5),emb,partos:emb-1,blood:BLOODS[Math.floor(Math.random()*BLOODS.length)],allergy:ALLERGIES[Math.floor(Math.random()*ALLERGIES.length)],cond};
+}
+function medState(p,m){
+  const c=p.hist.cond,a=p.hist.allergy;
+  if(m==='epidural'){
+    if(a==='Anestésicos locales')return {s:'no',why:'Alergia a anestésicos'};
+    if(c.includes('anticoag'))return {s:'no',why:'Anticoagulada'};
+    if(c.includes('hta'))return {s:'caution',why:'Vigilar tensión'};
+  }
+  if(m==='oxitocina'&&c.includes('cesarea'))return {s:'caution',why:'Cesárea previa'};
+  if(m==='suero'&&c.includes('hta'))return {s:'caution',why:'Hipertensa: poco volumen'};
+  return {s:'ok',why:'Segura'};
+}
+function giveEpidural(){
+  const p=sel;if(!G.run||!p||p.state!=='wait')return;
+  if(p.epi){note('Ya tiene la epidural puesta.','warn');return}
+  const st=medState(p,'epidural');
+  if(st.s==='no'){addScore(-60);G.combo=0;note('¡Contraindicada! '+st.why+'. Reacción adversa −60','bad');AU.buzz();logEv(p,'Epidural contraindicada: '+st.why.toLowerCase());if(EM.active)EM.t=Math.max(0,EM.t-3);return}
+  if(p.labor<25){addScore(-10);note('Demasiado pronto: la epidural frenaría el parto. −10','warn');AU.buzz();return}
+  if(p.labor>=85){note('Ya es tarde: está lista para pujar.','warn');return}
+  p.epi=true;const gain=st.s==='caution'?15:30;addScore(gain);G.combo++;
+  note('Epidural puesta: el dolor baja. +'+gain+(st.s==='caution'?' (vigila la tensión)':''),'good');AU.chime();logEv(p,'Epidural administrada');renderStats();
+}
+function buildSide(){
+  $('#tlMed').innerHTML=MEDS.map(([k,n])=>'<div class="mr" data-m="'+k+'"><i class="lamp"></i><b>'+n+'</b><span></span></div>').join('');
+  MEDS.forEach(([k])=>{medRows[k]=$('#tlMed .mr[data-m="'+k+'"]')});
+  $('#crew').innerHTML=docs.map(d=>'<div class="cr"><i class="duty"></i><div><b>'+d.name+'</b><small>'+d.title+'</small></div><span class="cr-st"></span></div>').join('');
+}
+function renderHist(p){
+  const el=$('#hist');
+  if(!p){el.innerHTML='<div class="lbl">Selecciona una paciente</div>';return}
+  const h=p.hist,risk=h.cond.length+(h.allergy==='Anestésicos locales'?1:0);
+  const rk=risk>=2?['Alto','hi']:risk===1?['Medio','mid']:['Bajo','lo'];
+  el.innerHTML='<div class="h-name"><b>'+p.name+'</b><span class="chip '+rk[1]+'">Riesgo '+rk[0]+'</span></div>'+
+  '<dl class="h-grid"><dt>Edad</dt><dd>'+h.age+' años</dd><dt>Gestación</dt><dd>'+h.weeks+' semanas</dd><dt>Embarazo</dt><dd>n.º '+h.emb+'</dd><dt>Partos previos</dt><dd>'+h.partos+'</dd><dt>Grupo</dt><dd>'+h.blood+'</dd><dt>Alergias</dt><dd>'+h.allergy+'</dd><dt>Tiempo en sala</dt><dd id="hSince">00:00</dd></dl>'+
+  '<div class="lbl">Antecedentes</div><div class="chips">'+(h.cond.length?h.cond.map(k=>'<span class="chip warn">'+CONDS[k]+'</span>').join(''):'<span class="chip lo">Sin antecedentes</span>')+'</div>'+
+  '<div class="lbl" style="margin-top:8px">Evolución</div><ul class="plog">'+p.log.slice(-5).reverse().map(e=>'<li><time>'+e.t+'</time>'+e.x+'</li>').join('')+'</ul>';
+}
+function updSide(p){
+  const sig=p?p.name+'|'+p.log.length+'|'+p.epi:'';
+  if(sig!==histSig){histSig=sig;renderHist(p)}
+  const hs=$('#hSince');if(hs&&p)hs.textContent=fmt(G.t-p.t0);
+  const lv=p?Math.round(p.pain*10):0,r=lv>=7,y=lv>=4&&lv<7,g=lv<4;
+  const L=document.querySelectorAll('#tlPain .lamps i');L[0].classList.toggle('on',g);L[1].classList.toggle('on',y);L[2].classList.toggle('on',r);
+  $('#tlNum').textContent=lv+'/10';$('#tlTxt').textContent=r?'Intenso':y?'Moderado':'Leve';
+  $('#tlTime').textContent=p?(p.contr?'contracción en curso':'próx. '+fmt(p.nextC)):'—';
+  MEDS.forEach(([k])=>{
+    const row=medRows[k];if(!row)return;
+    if(!p){row.className='mr';return}
+    if(k==='epidural'&&p.epi){row.className='mr done';row.lastChild.textContent='Administrada';return}
+    const st=medState(p,k);row.className='mr '+st.s;row.lastChild.textContent=st.why;
+  });
+  document.querySelectorAll('.btn.tr .dot').forEach(d=>{d.className='dot '+(p?medState(p,d.parentNode.dataset.t).s:'')});
+  const kids=$('#crew').children;
+  for(let i=0;i<kids.length;i++)kids[i].querySelector('.cr-st').textContent=p?'Con '+p.name:'Libre';
+}
+
+/* ============ HUD ============ */
+const cardsEl=$('#cards');
+const CARD_NAMES=['Cama 1','Cama 2','Paritorio'];
+for(let i=0;i<3;i++){
+  const b=document.createElement('button');b.type='button';b.className='pc empty';b.dataset.slot=i;
+  b.innerHTML='<div class="pc-top"><span>'+CARD_NAMES[i]+'</span><span class="pc-st">Libre</span></div><div class="pc-name">—</div><div class="pc-row"><b class="pc-pct">0%</b><div class="bar"><i></i><u></u></div></div>';
+  b.addEventListener('click',()=>{const p=bySlot(i);if(p&&G.run)select(p)});
+  cardsEl.appendChild(b);
+}
+const cardEls=[...cardsEl.children];
+function renderLives(){$('#lives').innerHTML=[0,1,2].map(i=>'<div class="heart'+(i<G.lives?'':' off')+'"></div>').join('')}
+function renderStats(){$('#score').textContent=G.score;$('#births').textContent=G.births+'/'+G.goal}
+const R=2*Math.PI*44;
+['c1-prog','c1-win','c2-prog'].forEach(id=>{const e=$('#'+id);e.style.strokeDasharray=R+' '+R;e.style.strokeDashoffset=R});
+function setRing(id,frac){$('#'+id).style.strokeDashoffset=R*(1-clamp(frac,0,1))}
+const STATE_TXT={wait:'Dilatando',moving:'En traslado',arriving:'Llegando',birth:'Dando a luz',leaving:'Sale de sala'};
+function updHUD(){
+  renderStats();$('#gtime').textContent=fmt(G.t);
+  cardEls.forEach((el,i)=>{
+    const p=bySlot(i);
+    el.classList.toggle('empty',!p);el.classList.toggle('sel',!!p&&p===sel);el.classList.toggle('alarm',!!p&&!!p.emerg);
+    const st=el.querySelector('.pc-st'),nm=el.querySelector('.pc-name'),pc=el.querySelector('.pc-pct'),bar=el.querySelector('.bar i');
+    if(!p){el.style.removeProperty('--pl');st.textContent=i===2?'Libre':'Esperando';nm.textContent='—';pc.textContent='';bar.style.width='0%';return}
+    const plv=Math.round(p.pain*10);el.style.setProperty('--pl',plv>=7?'#ff4155':plv>=4?'#ffc24d':'#3be08a');
+    nm.textContent=p.name;pc.textContent=Math.round(p.labor)+'%';bar.style.width=p.labor+'%';
+    let s=STATE_TXT[p.state]||'';if(p.emerg)s='ALARMA';else if(i<2&&p.labor>=100&&p.state==='wait')s='¡Ya! '+Math.ceil(12-p.grace)+' s';else if(i===2&&p.state==='wait')s='Pujos '+p.pushes+'/3';
+    st.textContent=s;
+  });
+  const p=sel;
+  const par=p&&p.slot===2;
+  // Cronómetro 1
+  if(p){
+    $('#c1-who').textContent=p.name+' · '+(par?'paritorio':'cama '+(p.slot+1));
+    $('#prob').textContent=Math.round(p.labor)+'%';$('#probBar').style.width=p.labor+'%';
+    $('#painTxt').textContent=Math.round(p.pain*10)+'/10';$('#painBar').style.width=(p.pain*100)+'%';
+    const win=$('#c1-win'),prog=$('#c1-prog');
+    if(p.contr){
+      const ph=p.cT/p.dur;setRing('c1-prog',ph);
+      $('#c1-time').textContent=fmt(p.dur-p.cT);$('#c1-lab').textContent=par?(ph>=.3&&ph<=.72?'¡PUJA!':'contracción'):'contracción';
+      prog.style.stroke=par&&ph>=.3&&ph<=.72?'#7dffb0':'#ffc24d';
+    }else{
+      setRing('c1-prog',1-Math.min(1,Math.max(0,p.nextC)/(par?3:12)));
+      $('#c1-time').textContent=fmt(p.nextC);$('#c1-lab').textContent='próxima';prog.style.stroke='#3fd6bd';
+    }
+    if(par){win.style.opacity=.9;win.style.strokeDasharray=(R*.42)+' '+R;win.style.strokeDashoffset=-R*.3}else win.style.opacity=0;
+  }else{$('#c1-who').textContent='Sin paciente'}
+  // Cronómetro 2
+  const clk2=$('#clk2');clk2.classList.toggle('on',EM.active);
+  if(EM.active){
+    setRing('c2-prog',EM.t/EM.max);$('#c2-time').textContent=fmt(EM.t);$('#c2-lab').textContent='¡alarma!';
+    $('#em-txt').textContent=EM.p.name+': '+EMTYPES[EM.type].txt+'.';
+  }else{
+    setRing('c2-prog',0);$('#c2-time').textContent='OK';$('#c2-lab').textContent='estable';
+    $('#em-txt').textContent=G.run?'Sin alarmas. Vigila las constantes.':'Esperando el inicio del turno.';
+  }
+  // botones
+  const canMove=G.run&&p&&p.slot<2&&p.state==='wait'&&!patients.some(q=>q.slot===2);
+  $('#btnMove').disabled=!canMove;
+  $('#btnMove').firstChild.textContent=p&&p.slot===2?'Ya en paritorio ':(patients.some(q=>q.slot===2)&&p&&p.slot<2?'Paritorio ocupado ':'Trasladar a paritorio ');
+  $('#btnPush').disabled=!(G.run&&p&&par&&p.state==='wait');
+  document.querySelectorAll('.btn.tr').forEach(b=>{b.disabled=b.dataset.t==='epidural'?!(G.run&&p&&p.state==='wait'&&!p.epi):!(G.run&&EM.active)});
+  // guía
+  const gd=$('#guide');gd.classList.toggle('alarm',EM.active);
+  let g='';
+  if(!G.run)g='Pulsa «Empezar turno» para comenzar.';
+  else if(EM.active){const c=CURE_NAME[EMTYPES[EM.type].cure];g='ALARMA en '+EM.p.name+': '+EMTYPES[EM.type].txt.toLowerCase()+'. Aplica '+c+' antes de que llegue a cero.'}
+  else if(par&&p.state==='wait'&&p.labor<85)g=p.name+' aún no está lista para pujar ('+Math.round(p.labor)+'%). Espera al 85%.';
+  else if(par&&p.state==='wait')g='Pulsa PUJAR cuando el Cronómetro 1 entre en la zona verde. Llevas '+p.pushes+' de 3.';
+  else{
+    const dil=alive().filter(q=>q.slot<2&&q.state==='wait').sort((a,b)=>b.labor-a.labor);
+    const occ=patients.some(q=>q.slot===2);
+    if(dil.length&&dil[0].grace>0)g='¡'+dil[0].name+' va a dar a luz en la cama! Tienes '+Math.ceil(12-dil[0].grace)+' s para trasladarla.';
+    else if(dil.length>1)g='Compara las probabilidades: '+dil[0].name+' ('+Math.round(dil[0].labor)+'%) va por delante de '+dil[1].name+' ('+Math.round(dil[1].labor)+'%). '+(occ?'Espera a que quede libre el paritorio.':'Selecciona a la más adelantada y trasládala.');
+    else if(dil.length===1)g=dil[0].name+' está al '+Math.round(dil[0].labor)+'%. '+(occ?'El paritorio sigue ocupado.':'Tras el 60% puedes trasladarla.');
+    else g='Llega una nueva paciente...';
+  }
+  gd.textContent=g;
+  updSide(p);
+}
+
+/* ============ FLUJO ============ */
+function resetWorld(){
+  patients.slice().forEach(removePatient);patients=[];beds=[];pending=[];sel=null;
+  clearEmergency();EM.next=20;
+  G.score=0;G.lives=3;G.births=0;G.combo=0;G.t=0;
+  docA.h.baby.visible=false;
+}
+function seedWorld(){
+  spawnPatient(0,true,rand(22,34));spawnPatient(1,true,rand(40,52));
+  sel=patients[0];
+  docA.pos.set(-4,0,1.8);docB.pos.set(-3,0,1.8);docA.goal.set(1e9,0,0);docB.goal.set(1e9,0,0);
+}
+function startGame(){
+  AU.init();AU.resume();
+  resetWorld();seedWorld();
+  G.run=true;shownEnd=false;
+  $('#overlay').hidden=true;renderLives();renderStats();
+  cam.mode='wide';$('#btnView').textContent='Acercar';
+  say('Turno iniciado. Compara a las pacientes y decide quién pasa al paritorio.','info');
+}
+function endGame(win){
+  if(shownEnd)return;shownEnd=true;G.run=false;
+  clearEmergency();AU.on&&win&&AU.chime();
+  const stars=win?(G.lives>=3?3:G.lives===2?2:1):0;
+  $('#ovcard').innerHTML='<h1>'+(win?'Turno completado':'Turno perdido')+'</h1>'+
+    '<p class="lead">'+(win?'Has atendido '+G.births+' partos. Las familias y el equipo te lo agradecen.':'Has perdido las tres vidas antes de completar los '+G.goal+' partos.')+'</p>'+
+    '<div class="lbl">Puntuación</div><div class="end-score">'+G.score+'</div>'+
+    '<div class="lbl" style="margin-bottom:14px">Valoración: '+(win?'★'.repeat(stars)+'☆'.repeat(3-stars):'—')+'</div>'+
+    '<button class="btn move go" id="again" type="button">Jugar otra vez</button>';
+  $('#overlay').hidden=false;$('#again').addEventListener('click',startGame);
+}
+function showMenu(){
+  $('#ovcard').innerHTML='<h1>Sala de Partos</h1>'+
+  '<p class="lead">Eres la coordinadora del turno de noche. Dos pacientes dilatan a la vez y las obstetras de guardia, la Dra. Elena y la Dra. Laura, te esperan.</p>'+
+  '<ol>'+
+  '<li><span><b>Compara</b> la probabilidad de parto de cada paciente y <b>traslada al paritorio</b> a la que esté más cerca.</span></li>'+
+  '<li><span>En el paritorio, pulsa <b>PUJAR</b> cuando el <b>Cronómetro 1</b> entre en la zona verde. Necesitas 3 pujos.</span></li>'+
+  '<li><span>Si suena la alarma (<b>Cronómetro 2</b>), elige el tratamiento correcto antes de que llegue a cero.</span></li>'+
+  '<li><span>Lee el <b>historial</b> y los <b>semáforos</b>: verde se puede dar, ámbar con precaución, rojo no. La epidural calma el dolor en rojo.</span></li>'+
+  '<li><span>Tienes 3 vidas. Consigue <b>6 partos</b> sin perderlas.</span></li></ol>'+
+  '<button class="btn move go" id="start" type="button">Empezar turno</button>'+
+  '<p class="fine">Con sonido: gemidos de las pacientes, monitor, sirena y voces del equipo. Arrastra para girar la cámara.</p>';
+  $('#overlay').hidden=false;$('#start').addEventListener('click',startGame);
+}
+
+/* ============ ENTRADAS ============ */
+$('#btnMove').addEventListener('click',requestMove);
+$('#btnPush').addEventListener('click',push);
+document.querySelectorAll('.btn.tr').forEach(b=>b.addEventListener('click',()=>treat(b.dataset.t)));
+$('#btnView').addEventListener('click',()=>{cam.mode=cam.mode==='wide'?'close':'wide';$('#btnView').textContent=cam.mode==='wide'?'Acercar':'Vista general';AU.click()});
+$('#btnSound').addEventListener('click',()=>{AU.init();AU.resume();AU.on=!AU.on;$('#btnSound').textContent='Sonido: '+(AU.on?'sí':'no');if(!AU.on){try{speechSynthesis.cancel()}catch(e){}}});
+window.addEventListener('keydown',e=>{
+  if(e.repeat)return;const k=e.key.toLowerCase();
+  if(e.code==='Space'){e.preventDefault();push()}
+  else if(k==='m')requestMove();
+  else if(k==='q')treat('oxigeno');else if(k==='w')treat('oxitocina');else if(k==='e')treat('suero');else if(k==='r')treat('epidural');
+  else if(k==='v'||k==='escape')$('#btnView').click();
+  else if(k>='1'&&k<='3'&&G.run){const p=bySlot(+k-1);if(p)select(p)}
+});
+// cámara: arrastrar para girar, tocar para elegir
+const ray=new THREE.Raycaster(),mouse=new THREE.Vector2();let down=null;
+canvas.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY,yaw:cam.yaw,moved:0};canvas.setPointerCapture(e.pointerId)});
+canvas.addEventListener('pointermove',e=>{if(!down)return;const dx=e.clientX-down.x;down.moved=Math.max(down.moved,Math.abs(dx)+Math.abs(e.clientY-down.y));cam.yaw=clamp(down.yaw-dx*.004,-1.1,1.1)});
+canvas.addEventListener('pointerup',e=>{
+  if(down&&down.moved<6&&G.run){
+    mouse.x=e.clientX/window.innerWidth*2-1;mouse.y=-(e.clientY/window.innerHeight)*2+1;
+    ray.setFromCamera(mouse,camera);
+    const hit=ray.intersectObjects(beds.map(b=>b.g),true)[0];
+    if(hit){let o=hit.object;while(o&&!(o.userData&&o.userData.bed))o=o.parent;if(o&&o.userData.bed.p)select(o.userData.bed.p)}
+  }
+  down=null;
+});
+canvas.addEventListener('pointercancel',()=>{down=null});
+
+/* ============ ARRANQUE ============ */
+const clock=new THREE.Clock();
+let camSmooth=false;
+function frame(){
+  requestAnimationFrame(frame);
+  const dt=Math.min(clock.getDelta(),.05);time+=dt;if(G.run)G.t+=dt;
+  pickDefaultSel();
+  beds.forEach(b=>updBed(b,dt));
+  patients.forEach(p=>{updPatient(p,dt,time);animPatient(p,time)});
+  emergencyTick(dt);updSpawns(dt);
+  docs.forEach(d=>animDoc(d,dt,time));
+  updMonitors(dt,time);updLamps(time);updConf(dt);
+  // pitidos del monitor y sirena
+  if(G.run&&sel&&sel.state==='wait'){
+    const bpm=sel.emerg==='fetal'?68:sel.emerg==='sangrado'?176:142-14*sel.pain;
+    beepAcc+=dt;if(beepAcc>=60/bpm){beepAcc=0;AU.beep()}
+  }
+  if(EM.active){sirenAcc+=dt;if(sirenAcc>.38){sirenAcc=0;sirenK^=1;AU.siren(sirenK)}}
+  // cámara
+  const tg=camTargets();const k=1-Math.exp(-dt*3.2);
+  cam.pos.lerp(tg.pos,k);cam.look.lerp(tg.look,k);
+  camera.position.copy(cam.pos);camera.lookAt(cam.look);
+  hudAcc+=dt;if(hudAcc>.08){hudAcc=0;updHUD()}
+  renderer.render(scene,camera);
+}
+buildSide();
+if(window.innerWidth<760)$('#side').hidden=true;
+$('#btnFicha').addEventListener('click',()=>{$('#side').hidden=!$('#side').hidden});
+$('#sdClose').addEventListener('click',()=>{$('#side').hidden=true});
+resize();renderLives();seedWorld();showMenu();
+camera.position.copy(cam.pos);
+window.__game={G,get patients(){return patients},get sel(){return sel},EM,cam,startGame,requestMove,push,treat,select,bySlot};
+frame();
+})();
+</script>
+
+</body></html>
